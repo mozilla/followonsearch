@@ -1,0 +1,6 @@
+.node-virtualenv
+.DS_Store
+build
+dist
+node_modules
+npm-debug.log

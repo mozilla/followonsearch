@@ -1,0 +1,4 @@
+.node-virtualenv
+build
+dist
+node_modules
