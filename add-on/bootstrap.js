@@ -7,6 +7,7 @@
 const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+Cu.import("resource://gre/modules/Timer.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "UpdateUtils",
   "resource://gre/modules/UpdateUtils.jsm");
@@ -29,6 +30,7 @@ const PREF_CHANNEL_OVERRIDE = `${kPrefPrefix}override`;
 
 const kExtensionID = "followonsearch@mozilla.com";
 const kSaveTelemetryMsg = `${kExtensionID}:save-telemetry`;
+const kShutdownMsg = `${kExtensionID}:shutdown`;
 
 const frameScript = `chrome://followonsearch/content/followonsearch-fs.js?q=${Math.random()}`;
 
@@ -104,7 +106,8 @@ function deactivateTelemetry() {
   TelemetryEnvironment.setExperimentInactive(kExtensionID);
 
   Services.mm.removeMessageListener(kSaveTelemetryMsg, handleSaveTelemetryMsg);
-  Services.mm.removeDelayedFrameScript(frameScript, true);
+  Services.mm.removeDelayedFrameScript(frameScript);
+  Services.mm.broadcastAsyncMessage(kShutdownMsg);
 
   gTelemetryActivated = false;
 }
@@ -219,7 +222,9 @@ function startup(data, reason) {
   cohortManager.init();
 
   if (cohortManager.enableForUser) {
-    activateTelemetry();
+    setTimeout(() => {
+      activateTelemetry();
+    }, 1000);
   }
 }
 

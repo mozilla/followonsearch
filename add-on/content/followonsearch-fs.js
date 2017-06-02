@@ -12,6 +12,7 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 const kExtensionID = "followonsearch@mozilla.com";
 const kSaveTelemetryMsg = `${kExtensionID}:save-telemetry`;
+const kShutdownMsg = `${kExtensionID}:shutdown`;
 
 /**
  * A map of search domains with their expected codes.
@@ -308,8 +309,13 @@ addEventListener("DOMContentLoaded", onPageLoad, false);
 docShell.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIWebProgress)
         .addProgressListener(webProgressListener, Ci.nsIWebProgress.NOTIFY_LOCATION);
 
-addEventListener("unload", event => {
-  if (event.target instanceof Ci.nsIContentFrameMessageManager) {
+let gDisabled = false;
+
+addMessageListener(kShutdownMsg, () => {
+  if (!gDisabled) {
     removeEventListener("DOMContentLoaded", onPageLoad, false);
+    docShell.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIWebProgress)
+            .removeProgressListener(webProgressListener);
+    gDisabled = true;
   }
-}, false);
+});
