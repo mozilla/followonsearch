@@ -7,6 +7,7 @@
 const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+Cu.import("resource://gre/modules/Timer.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "UpdateUtils",
   "resource://gre/modules/UpdateUtils.jsm");
@@ -29,17 +30,7 @@ const PREF_CHANNEL_OVERRIDE = `${kPrefPrefix}override`;
 
 const kExtensionID = "followonsearch@mozilla.com";
 const kSaveTelemetryMsg = `${kExtensionID}:save-telemetry`;
-
-const REASONS = {
-  APP_STARTUP: 1,      // The application is starting up.
-  APP_SHUTDOWN: 2,     // The application is shutting down.
-  ADDON_ENABLE: 3,     // The add-on is being enabled.
-  ADDON_DISABLE: 4,    // The add-on is being disabled. (Also sent during uninstallation)
-  ADDON_INSTALL: 5,    // The add-on is being installed.
-  ADDON_UNINSTALL: 6,  // The add-on is being uninstalled.
-  ADDON_UPGRADE: 7,    // The add-on is being upgraded.
-  ADDON_DOWNGRADE: 8,  // The add-on is being downgraded.
-};
+const kShutdownMsg = `${kExtensionID}:shutdown`;
 
 const frameScript = `chrome://followonsearch/content/followonsearch-fs.js?q=${Math.random()}`;
 
@@ -96,9 +87,8 @@ function activateTelemetry() {
 
   gTelemetryActivated = true;
 
-  let globalMM = Cc["@mozilla.org/globalmessagemanager;1"].getService(Ci.nsIMessageListenerManager);
-  globalMM.addMessageListener(kSaveTelemetryMsg, handleSaveTelemetryMsg);
-  globalMM.loadFrameScript(frameScript, true);
+  Services.mm.addMessageListener(kSaveTelemetryMsg, handleSaveTelemetryMsg);
+  Services.mm.loadFrameScript(frameScript, true);
 
   // Record the fact we're saving the extra data as a telemetry environment
   // value.
@@ -115,9 +105,9 @@ function deactivateTelemetry() {
 
   TelemetryEnvironment.setExperimentInactive(kExtensionID);
 
-  let globalMM = Cc["@mozilla.org/globalmessagemanager;1"].getService(Ci.nsIMessageListenerManager);
-  globalMM.removeMessageListener(kSaveTelemetryMsg, handleSaveTelemetryMsg);
-  globalMM.removeDelayedFrameScript(frameScript, true);
+  Services.mm.removeMessageListener(kSaveTelemetryMsg, handleSaveTelemetryMsg);
+  Services.mm.removeDelayedFrameScript(frameScript);
+  Services.mm.broadcastAsyncMessage(kShutdownMsg);
 
   gTelemetryActivated = false;
 }
@@ -232,7 +222,12 @@ function startup(data, reason) {
   cohortManager.init();
 
   if (cohortManager.enableForUser) {
-    activateTelemetry();
+    // Workaround for bug 1202125
+    // We need to delay our loading so that when we are upgraded,
+    // our new script doesn't get the shutdown message.
+    setTimeout(() => {
+      activateTelemetry();
+    }, 1000);
   }
 }
 
