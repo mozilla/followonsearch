@@ -120,6 +120,15 @@ describe("followonsearch-fs.js", function() {
 
           sinon.assert.notCalled(sendAsyncMessage);
         });
+
+        it("should not log telemetry for non-matching codes", function() {
+          location.query = "?q=test&ie=utf-8&oe=utf-8&client=fake";
+
+          webProgressListener.onLocationChange({isTopLevel: true}, null, location,
+            Components.interfaces.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT);
+
+          sinon.assert.notCalled(sendAsyncMessage);
+        });
       });
     });
   });
