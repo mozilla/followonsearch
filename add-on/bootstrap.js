@@ -147,9 +147,8 @@ var cohortManager = {
       cohortSample = Services.prefs.getFloatPref(PREF_COHORT_SAMPLE, undefined);
     } catch (e) {}
     if (!cohortSample) {
-      cohortSample = Math.random();
-      cohortSample = Services.prefs.setCharPref(PREF_COHORT_SAMPLE,
-        cohortSample.toString().substr(0, 8));
+      cohortSample = Math.random().toString().substr(0, 8);
+      cohortSample = Services.prefs.setCharPref(PREF_COHORT_SAMPLE, cohortSample);
     }
     log(`Cohort Sample value is ${cohortSample}`);
 
