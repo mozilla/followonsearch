@@ -18,8 +18,12 @@ Components.interfaces.nsIStandardURL.prototype = {
   set spec(hostname) { this._url.href = hostname; },
   get ref() { return this._url.hash; },
   set ref(hostname) { this._url.hash = hostname; },
+  schemeIs(scheme) { return `${scheme}:` == this._url.protocol; },
 };
-Components.utils = {import() {}};
+Components.utils = {
+  import() {},
+  importGlobalProperties() {}
+};
 
 var sendAsyncMessage = () => {};
 var webProgressListener;
