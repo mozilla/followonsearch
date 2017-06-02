@@ -222,6 +222,9 @@ function startup(data, reason) {
   cohortManager.init();
 
   if (cohortManager.enableForUser) {
+    // Workaround for bug 1202125
+    // We need to delay our loading so that when we are upgraded,
+    // our new script doesn't get the shutdown message.
     setTimeout(() => {
       activateTelemetry();
     }, 1000);
