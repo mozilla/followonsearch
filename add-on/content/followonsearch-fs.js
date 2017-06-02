@@ -9,6 +9,7 @@
 const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+Cu.importGlobalProperties(["URLSearchParams"]);
 
 const kExtensionID = "followonsearch@mozilla.com";
 const kSaveTelemetryMsg = `${kExtensionID}:save-telemetry`;
@@ -145,8 +146,14 @@ function log(message) {
   // console.log(message);
 }
 
+// Hack to handle the most common reload case.
+// If gLastSearch is the same as the current URL, ignore the search.
+// This also prevents us from handling reloads with hashes twice
+let gLastSearch = null;
+
 /**
- * A web progress listener to monitor for when googleDomains are loaded.
+ * Since most codes are in the URL, we can handle them via
+ * a progress listener.
  */
 var webProgressListener = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIWebProgressListener, Ci.nsISupportsWeakReference]),
@@ -154,57 +161,44 @@ var webProgressListener = {
   {
     try {
       if (!aWebProgress.isTopLevel ||
-          !(aFlags & Ci.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT) ||
-          !(aLocation instanceof Ci.nsIStandardURL) ||
-          !(googleDomains.has(aLocation.host)) ||
+          // Not a URL
+          (!aLocation.schemeIs("http") && !aLocation.schemeIs("https")) ||
+          // Not a domain we handle
+          !(aLocation.host in searchDomains) ||
+          // Doesn't have a query string or a ref
           (!aLocation.query && !aLocation.ref) ||
+          // Is the same as our last search (avoids reloads)
           aLocation.spec == gLastSearch) {
         return;
       }
       let domainInfo = searchDomains[aLocation.host];
 
-      let queries = parseUrlQueryString(aLocation.query);
-      if (aLocation.ref) {
-        // Google puts queries after the # sign, and
-        // that indicates a followon search
-        queries = parseUrlQueryString(aLocation.ref, queries);
-      }
-      let code = queries[domainInfo.prefix];
-      if (queries[domainInfo.search]) {
+      let queries = new URLSearchParams(aLocation.query);
+      let code = queries.get(domainInfo.prefix);
+      if (queries.get(domainInfo.search)) {
         if (domainInfo.codes.includes(code)) {
-          if (aLocation.ref) {
+          if (domainInfo.reportPrefix &&
+              queries.get(domainInfo.reportPrefix)) {
+            code = queries.get(domainInfo.reportPrefix);
+          }
+          if (googleDomains.has(aLocation.host) && aLocation.ref) {
+            log(`${aLocation.host} search with code ${code} - Follow on`);
+            sendSaveTelemetryMsg(code, domainInfo.sap, "follow-on");
+          } else if (queries.get(domainInfo.followOnSearch)) {
             log(`${aLocation.host} search with code ${code} - Follow on`);
             sendSaveTelemetryMsg(code, domainInfo.sap, "follow-on");
           } else {
             log(`${aLocation.host} search with code ${code} - First search via Firefox`);
             sendSaveTelemetryMsg(code, domainInfo.sap, "sap");
           }
+          gLastSearch = aLocation.spec;
         }
-        gLastSearch = aLocation.spec;
       }
     } catch (e) {
       console.error(e);
     }
   },
 };
-
-/**
- * Parses a URL query string into separate parts.
- *
- * @param {String} queryString The string to parse.
- * @param {Object} [params] An optional object to append the parameters to.
- * @return {Object} An object containing the query keys and values.
- */
-function parseUrlQueryString(queryString, params = {}) {
-  var queries = queryString.replace(/^\?/, "").split("&");
-
-  for (var i in queries) {
-    var kvp = queries[i].split("=");
-    params[kvp[0]] = kvp[1];
-  }
-
-  return params;
-}
 
 /**
  * Parses a cookie string into separate parts.
@@ -224,14 +218,10 @@ function parseCookies(cookieString, params = {}) {
   return params;
 }
 
-// Hack to handle the most common reload case.
-// If lastSearch is the same as the current URL, ignore the search.
-// This also prevents us from handling reloads with hashes twice
-let gLastSearch = null;
-
 /**
- * Page load listener to handle loads for search domains.
- *
+ * Page load listener to handle loads www.bing.com only.
+ * We have to use a page load listener because we need
+ * to check cookies.
  * @param {Object} event The page load event.
  */
 function onPageLoad(event) {
@@ -243,47 +233,19 @@ function onPageLoad(event) {
   var uri = doc.documentURIObject;
   if (!(uri instanceof Ci.nsIStandardURL) ||
       (!uri.schemeIs("http") && !uri.schemeIs("https")) ||
-      !(uri.host in searchDomains) ||
-      (!doc.location.search && !doc.location.hasRef) ||
+       uri.host != "www.bing.com" ||
+      !doc.location.search ||
       uri.spec == gLastSearch) {
     return;
   }
-  let domainInfo = searchDomains[uri.host];
-
-  var queries = parseUrlQueryString(doc.location.search);
-  let code = queries[domainInfo.prefix];
-  if (queries[domainInfo.search]) {
-    if (domainInfo.codes.includes(code)) {
-      if (domainInfo.reportPrefix &&
-          queries[domainInfo.reportPrefix]) {
-        code = queries[domainInfo.reportPrefix];
-      }
-      if (queries[domainInfo.followOnSearch]) {
-        log(`${uri.host} search with code ${code} - Follow on`);
-        sendSaveTelemetryMsg(code, domainInfo.sap, "follow-on");
-      } else {
-        log(`${uri.host} search with code ${code} - First search via Firefox`);
-        sendSaveTelemetryMsg(code, domainInfo.sap, "sap");
-      }
-      /**
-       * We have to special case bing.com because follow on
-       * searches are marked with a cookies, not a URL param.
-       * This means we will overcount bing.
-       * They also mark all follow-on searches with form=QBRE
-       */
-    } else if (uri.host == "www.bing.com") {
-      if (queries.form == "QBRE") {
-        if (parseCookies(doc.cookie).SRCHS == "PC=MOZI") {
-          log(`${uri.host} search with code MOZI - Follow on`);
-          sendSaveTelemetryMsg("MOZI", domainInfo.sap, "follow-on");
-        }
-      } else if (parseCookies(doc.cookie).SRCHS == "PC=MOZI") {
-        // We know this isn't a true first search because it doesn't
-        // have one of the codes from the Firefox UI.
-        log(`${uri.host} search with code MOZI - Follow on`);
-        sendSaveTelemetryMsg("MOZI", domainInfo.sap, "follow-on");
-      }
-    }
+  var queries = new URLSearchParams(doc.location.search);
+  // For Bing, QBRE form code is used for all follow-on search
+  if (queries.get("form") != "QBRE") {
+    return;
+  }
+  if (parseCookies(doc.cookie).SRCHS == "PC=MOZI") {
+    log(`${uri.host} search with code MOZI - Follow on`);
+    sendSaveTelemetryMsg("MOZI", "bing", "follow-on");
     gLastSearch = uri.spec;
   }
 }
