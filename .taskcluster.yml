@@ -1,0 +1,58 @@
+version: 0
+metadata:
+  name: Follow-on Search
+  description: Follow-on Search CI Tasks
+  owner: "{{ event.head.user.email }}"
+  source: "{{ event.head.repo.url }}"
+tasks:
+  - provisionerId: "{{ taskcluster.docker.provisionerId }}"
+    metadata:
+      name: Follow-on Search Lint Tests
+      description: Follow-on Search Lint Tests
+      owner: "{{ event.head.user.email }}"
+      source: "{{ event.head.repo.url }}"
+    workerType: "{{ taskcluster.docker.workerType }}"
+    payload:
+      maxRunTime: 1200
+      image: node
+      command:
+        - "/bin/bash"
+        - "-lc"
+        - "git clone {{event.head.repo.url}} repo && cd repo && git checkout {{event.head.repo.branch}} && npm install && npm run lint:eslint"
+    extra:
+      github:
+        env: true
+        events:
+          - pull_request.opened
+          - pull_request.synchronize
+          - pull_request.reopened
+          - push
+  # - provisionerId: "{{ taskcluster.docker.provisionerId }}"
+  #   metadata:
+  #     name: Follow-on Search Unit Tests
+  #     description: Follow-on Search Unit Tests
+  #     owner: "{{ event.head.user.email }}"
+  #     source: "{{ event.head.repo.url }}"
+  #   workerType: "{{ taskcluster.docker.workerType }}"
+  #   payload:
+  #     env:
+  #       NEED_WINDOW_MANAGER: true
+  #     features:
+  #       taskclusterProxy: true
+  #     maxRunTime: 1200
+  #     image: node
+  #     command:
+  #       # Note: post install for virtualenv is done as a separate step as currently
+  #       # npm install is being run as root (bug 1093833). When that is fixed, we
+  #       # should be able to merge them.
+  #       - "/bin/bash"
+  #       - "-lc"
+  #       - "./bin/setup.sh && git clone {{event.head.repo.url}} repo && cd repo && git checkout {{event.head.repo.branch}} && npm install && npm run download && export FIREFOX_BINARY=`cat build/fflocation.txt` && FIREFOX_BIN=${FIREFOX_BINARY} npm run test:karma"
+  #   extra:
+  #     github:
+  #       env: true
+  #       events:
+  #         - pull_request.opened
+  #         - pull_request.synchronize
+  #         - pull_request.reopened
+  #         - push
