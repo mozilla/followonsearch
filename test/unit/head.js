@@ -26,6 +26,7 @@ Components.utils = {
 };
 
 var sendAsyncMessage = () => {};
+var addMessageListener = () => {};
 var webProgressListener;
 
 var docShell = {
