@@ -9,15 +9,9 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Timer.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "UpdateUtils",
-  "resource://gre/modules/UpdateUtils.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "TelemetryEnvironment",
-  "resource://gre/modules/TelemetryEnvironment.jsm");
-
 // Preferences this add-on uses.
 const kPrefPrefix = "extensions.followonsearch.";
 const PREF_LOGGING = `${kPrefPrefix}logging`;
-const PREF_CHANNEL_OVERRIDE = `${kPrefPrefix}override`;
 
 const kExtensionID = "followonsearch@mozilla.com";
 const kSaveTelemetryMsg = `${kExtensionID}:save-telemetry`;
@@ -80,10 +74,6 @@ function activateTelemetry() {
 
   Services.mm.addMessageListener(kSaveTelemetryMsg, handleSaveTelemetryMsg);
   Services.mm.loadFrameScript(frameScript, true);
-
-  // Record the fact we're saving the extra data as a telemetry environment
-  // value.
-  TelemetryEnvironment.setExperimentActive(kExtensionID, "active");
 }
 
 /**
@@ -93,8 +83,6 @@ function deactivateTelemetry() {
   if (!gTelemetryActivated) {
     return;
   }
-
-  TelemetryEnvironment.setExperimentInactive(kExtensionID);
 
   Services.mm.removeMessageListener(kSaveTelemetryMsg, handleSaveTelemetryMsg);
   Services.mm.removeDelayedFrameScript(frameScript);
