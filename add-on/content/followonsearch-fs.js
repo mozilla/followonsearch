@@ -231,9 +231,9 @@ function onPageLoad(event) {
       uri.spec == gLastSearch) {
     return;
   }
-  var queries = new URLSearchParams(doc.location.search);
+  var queries = new URLSearchParams(doc.location.search.toLowerCase());
   // For Bing, QBRE form code is used for all follow-on search
-  if (queries.get("form") != "QBRE") {
+  if (queries.get("form") != "qbre") {
     return;
   }
   if (parseCookies(doc.cookie).SRCHS == "PC=MOZI") {
