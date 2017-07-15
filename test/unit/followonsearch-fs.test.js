@@ -26,7 +26,13 @@ describe("followonsearch-fs.js", function() {
     it("should log an error for unsupported cases", function() {
       sandbox.stub(console, "error");
 
-      webProgressListener.onLocationChange(undefined, null, location,
+      let progress = {
+        get isTopLevel() {
+          let e = {};
+          throw e;
+        }
+      };
+      webProgressListener.onLocationChange(progress, null, location,
         Components.interfaces.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT);
 
       sinon.assert.calledOnce(console.error);
