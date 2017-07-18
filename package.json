@@ -42,7 +42,7 @@
   "scripts": {
     "bundle": "mkdir -p dist && cd add-on && zip -r -x .eslintrc -D -q ../dist/followonsearch.xpi . && cd ..",
     "download": "node scripts/get_ff.js",
-    "firefox": "scripts/runfx.js --binary ${FIREFOX_BINARY:-nightly} --profile dev",
+    "firefox": "node scripts/runfx.js --binary ${FIREFOX_BINARY:-nightly} --profile dev",
     "lint": "npm-run-all lint:*",
     "lint:eslint": "eslint --ext=.js,.json .",
     "lint:flake8": "flake8 .",
