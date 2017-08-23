@@ -64,6 +64,7 @@ let addonInstallRDF = Path.normalize(Path.join(addonSourceDir, "install.rdf"));
 let profile = Commander.profile || DEFAULT_PROFILE;
 let extensionsDir;
 let addonTargetFile;
+let compatibilityFile;
 Fs.stat(addonSourceDir).then(sourceStat => {
   if (!sourceStat.isDirectory()) {
     throw new Error("Not a directory");
@@ -79,6 +80,7 @@ Fs.stat(addonSourceDir).then(sourceStat => {
     // profile directory IF it doesn't exist yet.
     extensionsDir = Path.join(profilePath, "extensions");
     addonTargetFile = Path.join(extensionsDir, "followonsearch@mozilla.com");
+    compatibilityFile = Path.join(profilePath, "compatibility.ini");
     return Mkdirp(extensionsDir);
   })
   .then(() => ensureRemoved(addonTargetFile))
@@ -86,8 +88,8 @@ Fs.stat(addonSourceDir).then(sourceStat => {
   // directory to exist.
   .then(() => Fs.open(addonTargetFile, "w+"))
   .then(file => Fs.write(file, `${addonSourceDir}/`))
-  // Hack, touch the install.rdf to make Firefox pick up the changes.
-  .then(() => Fs.stat(addonInstallRDF))
+  // Hack, remove compatibility.ini to make Firefox pick up the changes.
+  .then(() => Fs.unlink(compatibilityFile))
   // eslint-disable-next-line no-sync
   .then(sourceStat => Fs.futimes(Fs.openSync(addonInstallRDF, "a+"), new Date(), new Date()))
   .then(() => {
