@@ -144,11 +144,11 @@ function log(message) {
 // If gLastSearchQueue includes the current URL, ignore the search.
 // This also prevents us from handling reloads with hashes twice
 let gLastSearchQueue = [];
-gLastSearchQueue.push = function (){
+gLastSearchQueue.push = function(...args) {
   if (this.length >= kLastSeachQueueDepth) {
     this.shift();
   }
-  return Array.prototype.push.apply(this, arguments);
+  return Array.prototype.push.apply(this, args);
 };
 
 // Keep track of the original window we were loaded in
@@ -202,16 +202,13 @@ var webProgressListener = {
           if (queries.get("oe") && queries.get("ie")) {
             sendSaveTelemetryMsg(code ? code : "none", domainInfo.sap, "sap");
             searchingGoogle = true;
-            return;
           } else {
             let tbm = queries.get("tbm");
             if (searchingGoogle) {
-              sendSaveTelemetryMsg(code ? code : "none", tbm ? domainInfo.sap + "-" + tbm : domainInfo.sap, "follow-on");
-            } else {
+              sendSaveTelemetryMsg(code ? code : "none", tbm ? `${domainInfo.sap}-${tbm}` : domainInfo.sap, "follow-on");
+            } else if (code) {
               // Trying to do the right thing for back button to existing entries
-              if (code) {
-                sendSaveTelemetryMsg(code, tbm ? domainInfo.sap + "-" + tbm : domainInfo.sap, "follow-on");
-              }
+              sendSaveTelemetryMsg(code, tbm ? `${domainInfo.sap}-${tbm}` : domainInfo.sap, "follow-on");
             }
           }
         }
