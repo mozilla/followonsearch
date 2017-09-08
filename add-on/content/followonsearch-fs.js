@@ -13,6 +13,7 @@ Cu.importGlobalProperties(["URLSearchParams"]);
 const kExtensionID = "followonsearch@mozilla.com";
 const kSaveTelemetryMsg = `${kExtensionID}:save-telemetry`;
 const kShutdownMsg = `${kExtensionID}:shutdown`;
+const kLastSeachQueueDepth = 10;
 
 /**
  * A map of search domains with their expected codes.
@@ -139,14 +140,24 @@ function log(message) {
   // console.log(message);
 }
 
-// Hack to handle the most common reload case.
-// If gLastSearch is the same as the current URL, ignore the search.
+// Hack to handle the most common reload/back/forward case.
+// If gLastSearchQueue includes the current URL, ignore the search.
 // This also prevents us from handling reloads with hashes twice
-let gLastSearch = null;
+let gLastSearchQueue = [];
+gLastSearchQueue.push = function (){
+  if (this.length >= kLastSeachQueueDepth) {
+    this.shift();
+  }
+  return Array.prototype.push.apply(this, arguments);
+};
 
 // Keep track of the original window we were loaded in
 // so we don't handle requests for other windows.
 let gOriginalWindow = null;
+
+// Track if we are in the middle of a Google session
+// that started from Firefox
+let searchingGoogle = false;
 
 /**
  * Since most codes are in the URL, we can handle them via
@@ -166,36 +177,63 @@ var webProgressListener = {
           // Doesn't have a query string or a ref
           (!aLocation.query && !aLocation.ref) ||
           // Is the same as our last search (avoids reloads)
-          aLocation.spec == gLastSearch) {
+          gLastSearchQueue.includes(aLocation.spec)) {
+        searchingGoogle = false;
         return;
       }
       let domainInfo = getSearchDomainCodes(aLocation.host);
       if (!domainInfo) {
+        searchingGoogle = false;
         return;
       }
 
       let queries = new URLSearchParams(aLocation.query);
       let code = queries.get(domainInfo.prefix);
+      // Special case Google so we can track searches
+      // without codes from the browser.
+      if (domainInfo.sap == "google") {
+        if (aLocation.filePath == "/search") {
+          gLastSearchQueue.push(aLocation.spec);
+          // Our engine currently sends oe and ie - no one else does
+          if (queries.get("oe") && queries.get("ie")) {
+            sendSaveTelemetryMsg(code ? code : "none", domainInfo.sap, "sap");
+            searchingGoogle = true;
+            return;
+          } else {
+            let tbm = queries.get("tbm");
+            if (searchingGoogle) {
+              sendSaveTelemetryMsg(code ? code : "none", tbm ? domainInfo.sap + "-" + tbm : domainInfo.sap, "follow-on");
+            } else {
+              // Trying to do the right thing for back button to existing entries
+              if (code) {
+                sendSaveTelemetryMsg(code, tbm ? domainInfo.sap + "-" + tbm : domainInfo.sap, "follow-on");
+              }
+            }
+          }
+        }
+        // Special case all Google. Otherwise our code can
+        // show up in maps
+        return;
+      }
+      searchingGoogle = false;
       if (queries.get(domainInfo.search)) {
         if (domainInfo.codes.includes(code)) {
           if (domainInfo.reportPrefix &&
               queries.get(domainInfo.reportPrefix)) {
             code = queries.get(domainInfo.reportPrefix);
           }
-          if (domainInfo.sap == "google" && aLocation.ref) {
-            log(`${aLocation.host} search with code ${code} - Follow on`);
-            sendSaveTelemetryMsg(code, domainInfo.sap, "follow-on");
-          } else if (queries.get(domainInfo.followOnSearch)) {
+          if (queries.get(domainInfo.followOnSearch)) {
             log(`${aLocation.host} search with code ${code} - Follow on`);
             sendSaveTelemetryMsg(code, domainInfo.sap, "follow-on");
           } else {
             log(`${aLocation.host} search with code ${code} - First search via Firefox`);
             sendSaveTelemetryMsg(code, domainInfo.sap, "sap");
           }
-          gLastSearch = aLocation.spec;
+          gLastSearchQueue.push(aLocation.spec);
         }
       }
     } catch (e) {
+      Components.utils.reportError(e);
       console.error(e);
     }
   },
@@ -236,7 +274,7 @@ function onPageLoad(event) {
       (!uri.schemeIs("http") && !uri.schemeIs("https")) ||
        uri.host != "www.bing.com" ||
       !doc.location.search ||
-      uri.spec == gLastSearch) {
+      gLastSearchQueue.includes(uri.spec)) {
     return;
   }
   var queries = new URLSearchParams(doc.location.search.toLowerCase());
@@ -247,7 +285,7 @@ function onPageLoad(event) {
   if (parseCookies(doc.cookie).SRCHS == "PC=MOZI") {
     log(`${uri.host} search with code MOZI - Follow on`);
     sendSaveTelemetryMsg("MOZI", "bing", "follow-on");
-    gLastSearch = uri.spec;
+    gLastSearchQueue.push(uri.spec);
   }
 }
 
