@@ -175,10 +175,14 @@ var webProgressListener = {
           // Not a URL
           (!aLocation.schemeIs("http") && !aLocation.schemeIs("https")) ||
           // Doesn't have a query string or a ref
-          (!aLocation.query && !aLocation.ref) ||
-          // Is the same as our last search (avoids reloads)
-          gLastSearchQueue.includes(aLocation.spec)) {
+          (!aLocation.query && !aLocation.ref)) {
         searchingGoogle = false;
+        return;
+      }
+      if (gLastSearchQueue.includes(aLocation.spec)) {
+        // If it's a recent search, just return. We
+        // don't reset searchingGoogle though because
+        // we might still be doing that.
         return;
       }
       let domainInfo = getSearchDomainCodes(aLocation.host);
