@@ -205,10 +205,10 @@ var webProgressListener = {
           } else {
             let tbm = queries.get("tbm");
             if (searchingGoogle) {
-              sendSaveTelemetryMsg(code ? code : "none", tbm ? `${domainInfo.sap}-${tbm}` : domainInfo.sap, "follow-on");
+              sendSaveTelemetryMsg(code ? code : "none", domainInfo.sap, "follow-on", tbm);
             } else if (code) {
               // Trying to do the right thing for back button to existing entries
-              sendSaveTelemetryMsg(code, tbm ? `${domainInfo.sap}-${tbm}` : domainInfo.sap, "follow-on");
+              sendSaveTelemetryMsg(code, domainInfo.sap, "follow-on", tbm);
             }
           }
         }
@@ -298,11 +298,12 @@ function onPageLoad(event) {
  * @param {String} sap The SAP code.
  * @param {String} type The type of search (sap/follow-on).
  */
-function sendSaveTelemetryMsg(code, sap, type) {
+function sendSaveTelemetryMsg(code, sap, type, addl) {
   sendAsyncMessage(kSaveTelemetryMsg, {
     code,
     sap,
     type,
+    addl,
   });
 }
 
