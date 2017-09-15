@@ -59,7 +59,11 @@ function handleSaveTelemetryMsg(message) {
   log(info);
 
   let histogram = Services.telemetry.getKeyedHistogramById("SEARCH_COUNTS");
-  histogram.add(`${info.sap}.${info.type}:unknown:${info.code}`);
+  let payload = `${info.sap}.${info.type}:unknown:${info.code}`;
+  if (info.extra) {
+    payload += `:${info.extra}`
+  }
+  histogram.add(payload);
 }
 
 /**
