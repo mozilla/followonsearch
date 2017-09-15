@@ -203,6 +203,8 @@ var webProgressListener = {
             sendSaveTelemetryMsg(code ? code : "none", domainInfo.sap, "sap");
             searchingGoogle = true;
           } else {
+            // The tbm value is the specific type of search (Books, Images, News, etc).
+            // These are referred to as vertical searches.
             let tbm = queries.get("tbm");
             if (searchingGoogle) {
               sendSaveTelemetryMsg(code ? code : "none", domainInfo.sap, "follow-on", tbm ? `vertical-${tbm}` : null);
