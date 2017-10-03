@@ -151,10 +151,6 @@ gLastSearchQueue.push = function(...args) {
   return Array.prototype.push.apply(this, args);
 };
 
-// Keep track of the original window we were loaded in
-// so we don't handle requests for other windows.
-let gOriginalWindow = null;
-
 // Track if we are in the middle of a Google session
 // that started from Firefox
 let searchingGoogle = false;
@@ -167,7 +163,7 @@ var webProgressListener = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIWebProgressListener, Ci.nsISupportsWeakReference]),
   onLocationChange(aWebProgress, aRequest, aLocation, aFlags)
   {
-    if (aWebProgress.DOMWindow && (aWebProgress.DOMWindow != gOriginalWindow)) {
+    if (aWebProgress.DOMWindow && (aWebProgress.DOMWindow != content)) {
       return;
     }
     try {
@@ -312,8 +308,6 @@ function sendSaveTelemetryMsg(code, sap, type, extra) {
 addEventListener("DOMContentLoaded", onPageLoad, false);
 docShell.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIWebProgress)
         .addProgressListener(webProgressListener, Ci.nsIWebProgress.NOTIFY_LOCATION);
-
-gOriginalWindow = content;
 
 let gDisabled = false;
 
