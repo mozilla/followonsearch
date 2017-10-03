@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* global APP_SHUTDOWN:false */
+
 "use strict";
 
 const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
@@ -137,16 +139,7 @@ var cohortManager = {
  * @param {Number} reason Indicates why the extension is being installed.
  */
 function install(data, reason) {
-  try {
-    gLoggingEnabled = Services.prefs.getBoolPref(PREF_LOGGING, false);
-  } catch (e) {
-    // Needed until Firefox 54
-  }
-
-  cohortManager.init();
-  if (cohortManager.enableForUser) {
-    activateTelemetry();
-  }
+  // Nothing specifically to do, startup will set everything up for us.
 }
 
 /**
@@ -156,7 +149,7 @@ function install(data, reason) {
  * @param {Number} reason Indicates why the extension is being uninstalled.
  */
 function uninstall(data, reason) {
-  deactivateTelemetry();
+  // Nothing specifically to do, shutdown does what we need.
 }
 
 /**
@@ -191,5 +184,10 @@ function startup(data, reason) {
  * @param {Number} reason Indicates why the extension is being shut down.
  */
 function shutdown(data, reason) {
+  // If we're shutting down, skip the cleanup to save time.
+  if (reason === APP_SHUTDOWN) {
+    return;
+  }
+
   deactivateTelemetry();
 }
