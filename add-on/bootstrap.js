@@ -2,14 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* global APP_SHUTDOWN:false */
-
 "use strict";
 
 const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/Timer.jsm");
 
 // Preferences this add-on uses.
 const kPrefPrefix = "extensions.followonsearch.";
@@ -17,9 +13,6 @@ const PREF_LOGGING = `${kPrefPrefix}logging`;
 
 const kExtensionID = "followonsearch@mozilla.com";
 const kSaveTelemetryMsg = `${kExtensionID}:save-telemetry`;
-const kShutdownMsg = `${kExtensionID}:shutdown`;
-
-const frameScript = `chrome://followonsearch/content/followonsearch-fs.js?q=${Math.random()}`;
 
 const validSearchTypes = [
   // A search is a follow-on search from an SAP.
@@ -29,7 +22,6 @@ const validSearchTypes = [
 ];
 
 var gLoggingEnabled = false;
-var gTelemetryActivated = false;
 
 /**
  * Logs a message to the console if logging is enabled.
@@ -38,7 +30,7 @@ var gTelemetryActivated = false;
  */
 function log(message) {
   if (gLoggingEnabled) {
-    console.log("Follow-On Search", message);
+    console.log("NEW Follow-On Search", message);
   }
 }
 
@@ -69,70 +61,6 @@ function handleSaveTelemetryMsg(message) {
 }
 
 /**
- * Activates recording of telemetry if it isn't already activated.
- */
-function activateTelemetry() {
-  if (gTelemetryActivated) {
-    return;
-  }
-
-  gTelemetryActivated = true;
-
-  Services.mm.addMessageListener(kSaveTelemetryMsg, handleSaveTelemetryMsg);
-  Services.mm.loadFrameScript(frameScript, true);
-}
-
-/**
- * Deactivites recording of telemetry if it isn't already deactivated.
- */
-function deactivateTelemetry() {
-  if (!gTelemetryActivated) {
-    return;
-  }
-
-  Services.mm.removeMessageListener(kSaveTelemetryMsg, handleSaveTelemetryMsg);
-  Services.mm.removeDelayedFrameScript(frameScript);
-  Services.mm.broadcastAsyncMessage(kShutdownMsg);
-
-  gTelemetryActivated = false;
-}
-
-/**
- * cohortManager is used to decide which users to enable the add-on for.
- */
-var cohortManager = {
-  // Indicates whether the telemetry should be enabled.
-  enableForUser: false,
-
-  // Records if we've already run init.
-  _definedThisSession: false,
-
-  /**
-   * Initialises the manager, working out if telemetry should be enabled
-   * for the user.
-   */
-  init() {
-    if (this._definedThisSession) {
-      return;
-    }
-
-    this._definedThisSession = true;
-    this.enableForUser = false;
-
-    try {
-      let distId = Services.prefs.getCharPref("distribution.id", "");
-      if (distId) {
-        log("It is a distribution, not setting up nor enabling telemetry.");
-        return;
-      }
-    } catch (e) {}
-
-    log("Enabling telemetry for user");
-    this.enableForUser = true;
-  },
-};
-
-/**
  * Called when the add-on is installed.
  *
  * @param {Object} data Data about the add-on.
@@ -158,23 +86,17 @@ function uninstall(data, reason) {
  * @param {Object} data Data about the add-on.
  * @param {Number} reason Indicates why the extension is being started.
  */
-function startup(data, reason) {
+function startup({webExtension}) {
   try {
     gLoggingEnabled = Services.prefs.getBoolPref(PREF_LOGGING, false);
   } catch (e) {
     // Needed until Firefox 54
   }
 
-  cohortManager.init();
-
-  if (cohortManager.enableForUser) {
-    // Workaround for bug 1202125
-    // We need to delay our loading so that when we are upgraded,
-    // our new script doesn't get the shutdown message.
-    setTimeout(() => {
-      activateTelemetry();
-    }, 1000);
-  }
+  webExtension.startup().then(api => {
+    const {browser} = api;
+    browser.runtime.onMessage.addListener(handleSaveTelemetryMsg);
+  });
 }
 
 /**
@@ -184,10 +106,4 @@ function startup(data, reason) {
  * @param {Number} reason Indicates why the extension is being shut down.
  */
 function shutdown(data, reason) {
-  // If we're shutting down, skip the cleanup to save time.
-  if (reason === APP_SHUTDOWN) {
-    return;
-  }
-
-  deactivateTelemetry();
 }

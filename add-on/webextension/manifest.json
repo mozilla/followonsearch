@@ -1,0 +1,18 @@
+
+
+{
+  "manifest_version": 2,
+  "name": "Test",
+  "version": "0.6",
+  "content_scripts_foo": [
+    {
+"matches": ["https://www.bing.com/search*"],
+       "js": ["contentscript.js"]
+    }
+    ],
+"background": {
+  "scripts": ["background.js"]
+},
+"permissions": ["tabs", "cookies", "https://www.bing.com/*"]
+
+}

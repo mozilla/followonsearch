@@ -6,14 +6,8 @@
 
 "use strict";
 
-const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.importGlobalProperties(["URLSearchParams"]);
-
 const kExtensionID = "followonsearch@mozilla.com";
 const kSaveTelemetryMsg = `${kExtensionID}:save-telemetry`;
-const kShutdownMsg = `${kExtensionID}:shutdown`;
-const kLastSearchQueueDepth = 10;
 
 /**
  * A map of search domains with their expected codes.
@@ -132,110 +126,34 @@ function getSearchDomainCodes(host) {
 }
 
 /**
- * Used for debugging to log messages.
+ * Sends a message to the process that added this script to tell it to save
+ * telemetry.
  *
- * @param {String} message The message to log.
+ * @param {String} code The codes used for the search engine.
+ * @param {String} sap The SAP code.
+ * @param {String} type The type of search (sap/follow-on).
+ * @param {String} extra Any additional parameters (Optional)
  */
-function log(message) {
-  // console.log(message);
+function sendSaveTelemetryMsg(code, sap, type, extra) {
+  browser.runtime.sendMessage(
+  {name: kSaveTelemetryMsg,
+   data: {
+   code: code,
+   sap: sap,
+   type: type,
+   extra: extra
+   }
+  });
 }
 
-// Hack to handle the most common reload/back/forward case.
-// If gLastSearchQueue includes the current URL, ignore the search.
-// This also prevents us from handling reloads with hashes twice
-let gLastSearchQueue = [];
-gLastSearchQueue.push = function(...args) {
-  if (this.length >= kLastSearchQueueDepth) {
-    this.shift();
+let queries = new URLSearchParams(location.search);
+// Handle Bing followon in cookies
+if (queries.get("form").toLowerCase() == "qbre") {
+  let cookies = new URLSearchParams(document.cookie.replace();
+  if (parseCookies(document.cookie).SRCHS == "PC=MOZI") {
+    sendSaveTelemetryMsg("MOZI", "bing", "follow-on");
   }
-  return Array.prototype.push.apply(this, args);
-};
-
-// Track if we are in the middle of a Google session
-// that started from Firefox
-let searchingGoogle = false;
-
-/**
- * Since most codes are in the URL, we can handle them via
- * a progress listener.
- */
-var webProgressListener = {
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIWebProgressListener, Ci.nsISupportsWeakReference]),
-  onLocationChange(aWebProgress, aRequest, aLocation, aFlags)
-  {
-    if (aWebProgress.DOMWindow && (aWebProgress.DOMWindow != content)) {
-      return;
-    }
-    try {
-      if (!aWebProgress.isTopLevel ||
-          // Not a URL
-          (!aLocation.schemeIs("http") && !aLocation.schemeIs("https")) ||
-          // Doesn't have a query string or a ref
-          (!aLocation.query && !aLocation.ref)) {
-        searchingGoogle = false;
-        return;
-      }
-      if (gLastSearchQueue.includes(aLocation.spec)) {
-        // If it's a recent search, just return. We
-        // don't reset searchingGoogle though because
-        // we might still be doing that.
-        return;
-      }
-      let domainInfo = getSearchDomainCodes(aLocation.host);
-      if (!domainInfo) {
-        searchingGoogle = false;
-        return;
-      }
-
-      let queries = new URLSearchParams(aLocation.query);
-      let code = queries.get(domainInfo.prefix);
-      // Special case Google so we can track searches
-      // without codes from the browser.
-      if (domainInfo.sap == "google") {
-        if (aLocation.filePath == "/search") {
-          gLastSearchQueue.push(aLocation.spec);
-          // Our engine currently sends oe and ie - no one else does
-          if (queries.get("oe") && queries.get("ie")) {
-            sendSaveTelemetryMsg(code ? code : "none", domainInfo.sap, "sap");
-            searchingGoogle = true;
-          } else {
-            // The tbm value is the specific type of search (Books, Images, News, etc).
-            // These are referred to as vertical searches.
-            let tbm = queries.get("tbm");
-            if (searchingGoogle) {
-              sendSaveTelemetryMsg(code ? code : "none", domainInfo.sap, "follow-on", tbm ? `vertical-${tbm}` : null);
-            } else if (code) {
-              // Trying to do the right thing for back button to existing entries
-              sendSaveTelemetryMsg(code, domainInfo.sap, "follow-on", tbm ? `vertical-${tbm}` : null);
-            }
-          }
-        }
-        // Special case all Google. Otherwise our code can
-        // show up in maps
-        return;
-      }
-      searchingGoogle = false;
-      if (queries.get(domainInfo.search)) {
-        if (domainInfo.codes.includes(code)) {
-          if (domainInfo.reportPrefix &&
-              queries.get(domainInfo.reportPrefix)) {
-            code = queries.get(domainInfo.reportPrefix);
-          }
-          if (queries.get(domainInfo.followOnSearch)) {
-            log(`${aLocation.host} search with code ${code} - Follow on`);
-            sendSaveTelemetryMsg(code, domainInfo.sap, "follow-on");
-          } else {
-            log(`${aLocation.host} search with code ${code} - First search via Firefox`);
-            sendSaveTelemetryMsg(code, domainInfo.sap, "sap");
-          }
-          gLastSearchQueue.push(aLocation.spec);
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  },
-};
+}
 
 /**
  * Parses a cookie string into separate parts.
@@ -254,68 +172,3 @@ function parseCookies(cookieString, params = {}) {
 
   return params;
 }
-
-/**
- * Page load listener to handle loads www.bing.com only.
- * We have to use a page load listener because we need
- * to check cookies.
- * @param {Object} event The page load event.
- */
-function onPageLoad(event) {
-  var doc = event.target;
-  var win = doc.defaultView;
-  if (win != win.top) {
-    return;
-  }
-  var uri = doc.documentURIObject;
-  if (!(uri instanceof Ci.nsIStandardURL) ||
-      (!uri.schemeIs("http") && !uri.schemeIs("https")) ||
-       uri.host != "www.bing.com" ||
-      !doc.location.search ||
-      gLastSearchQueue.includes(uri.spec)) {
-    return;
-  }
-  var queries = new URLSearchParams(doc.location.search.toLowerCase());
-  // For Bing, QBRE form code is used for all follow-on search
-  if (queries.get("form") != "qbre") {
-    return;
-  }
-  if (parseCookies(doc.cookie).SRCHS == "PC=MOZI") {
-    log(`${uri.host} search with code MOZI - Follow on`);
-    sendSaveTelemetryMsg("MOZI", "bing", "follow-on");
-    gLastSearchQueue.push(uri.spec);
-  }
-}
-
-/**
- * Sends a message to the process that added this script to tell it to save
- * telemetry.
- *
- * @param {String} code The codes used for the search engine.
- * @param {String} sap The SAP code.
- * @param {String} type The type of search (sap/follow-on).
- * @param {String} extra Any additional parameters (Optional)
- */
-function sendSaveTelemetryMsg(code, sap, type, extra) {
-  sendAsyncMessage(kSaveTelemetryMsg, {
-    code,
-    sap,
-    type,
-    extra,
-  });
-}
-
-addEventListener("DOMContentLoaded", onPageLoad, false);
-docShell.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIWebProgress)
-        .addProgressListener(webProgressListener, Ci.nsIWebProgress.NOTIFY_LOCATION);
-
-let gDisabled = false;
-
-addMessageListener(kShutdownMsg, () => {
-  if (!gDisabled) {
-    removeEventListener("DOMContentLoaded", onPageLoad, false);
-    docShell.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIWebProgress)
-            .removeProgressListener(webProgressListener);
-    gDisabled = true;
-  }
-});
