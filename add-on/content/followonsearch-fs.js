@@ -196,14 +196,14 @@ var webProgressListener = {
           gLastSearchQueue.push(aLocation.spec);
           // Our engine currently sends oe and ie - no one else does
           if (queries.get("oe") && queries.get("ie")) {
-            sendSaveTelemetryMsg(code ? code : "none", domainInfo.sap, "sap");
+            sendSaveTelemetryMsg(code ? code : "none", code ? domainInfo.sap : "google-nocodes", "sap");
             searchingGoogle = true;
           } else {
             // The tbm value is the specific type of search (Books, Images, News, etc).
             // These are referred to as vertical searches.
             let tbm = queries.get("tbm");
             if (searchingGoogle) {
-              sendSaveTelemetryMsg(code ? code : "none", domainInfo.sap, "follow-on", tbm ? `vertical-${tbm}` : null);
+              sendSaveTelemetryMsg(code ? code : "none", code ? domainInfo.sap : "google-nocodes", "follow-on", tbm ? `vertical-${tbm}` : null);
             } else if (code) {
               // Trying to do the right thing for back button to existing entries
               sendSaveTelemetryMsg(code, domainInfo.sap, "follow-on", tbm ? `vertical-${tbm}` : null);
