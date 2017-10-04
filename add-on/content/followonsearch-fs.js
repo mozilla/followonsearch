@@ -30,7 +30,7 @@ let searchDomains = [{
   "search": "q",
   "prefix": "pc",
   "reportPrefix": "form",
-  "codes": ["MOZI"],
+  "codes": ["MOZI", "MOZD", "MZSL01", "MZSL02", "MZSL03", "MOZ2"],
   "sap": "bing",
 }, {
   // The Yahoo domains to watch for.
