@@ -148,14 +148,14 @@ function getSearchDomainCodes(host) {
  * @param {String} extra Any additional parameters (Optional)
  */
 function sendSaveTelemetryMsg(code, sap, type, extra) {
-  browser.runtime.sendMessage(
-  {name: kSaveTelemetryMsg,
-   data: {
-   code: code,
-   sap: sap,
-   type: type,
-   extra: extra
-   }
+  browser.runtime.sendMessage({
+    name: kSaveTelemetryMsg,
+    data: {
+      code,
+      sap,
+      type,
+      extra
+    }
   });
 }
 

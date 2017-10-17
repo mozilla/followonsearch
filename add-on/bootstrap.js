@@ -6,6 +6,10 @@
 
 const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "LegacyExtensionsUtils",
+                                  "resource://gre/modules/LegacyExtensionsUtils.jsm");
 
 // Preferences this add-on uses.
 const kPrefPrefix = "extensions.followonsearch.";
@@ -30,7 +34,7 @@ var gLoggingEnabled = false;
  */
 function log(message) {
   if (gLoggingEnabled) {
-    console.log("NEW Follow-On Search", message);
+    console.log("WE Follow-On Search", message);
   }
 }
 
@@ -80,20 +84,25 @@ function uninstall(data, reason) {
   // Nothing specifically to do, shutdown does what we need.
 }
 
+let addonResourceURI;
+
 /**
  * Called when the add-on starts up.
  *
  * @param {Object} data Data about the add-on.
  * @param {Number} reason Indicates why the extension is being started.
  */
-function startup({webExtension}) {
+function startup(data, reason) {
   try {
     gLoggingEnabled = Services.prefs.getBoolPref(PREF_LOGGING, false);
   } catch (e) {
     // Needed until Firefox 54
   }
 
-  webExtension.startup().then(api => {
+  const webExtension = LegacyExtensionsUtils.getEmbeddedExtensionFor({
+    id: kExtensionID
+  });
+  webExtension.startup(reason).then(api => {
     const {browser} = api;
     browser.runtime.onMessage.addListener(handleSaveTelemetryMsg);
   });
@@ -106,4 +115,8 @@ function startup({webExtension}) {
  * @param {Number} reason Indicates why the extension is being shut down.
  */
 function shutdown(data, reason) {
+  const webExtension = LegacyExtensionsUtils.getEmbeddedExtensionFor({
+    id: kExtensionID
+  });
+  webExtension.shutdown(reason);
 }
