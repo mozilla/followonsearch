@@ -84,8 +84,6 @@ function uninstall(data, reason) {
   // Nothing specifically to do, shutdown does what we need.
 }
 
-let addonResourceURI;
-
 /**
  * Called when the add-on starts up.
  *
