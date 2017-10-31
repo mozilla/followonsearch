@@ -3,137 +3,118 @@
 /* import-globals-from head.js */
 /* import-globals-from ../../add-on/webextension/background.js */
 
+const TABID = 0;
+const TABINFO = {};
+
 describe("background.js", function() {
   let sandbox;
-  let location;
 
   beforeEach(function() {
     sandbox = sinon.sandbox.create();
     sandbox.stub(console, "log");
-    sendAsyncMessage = sandbox.spy();
-
-    // Set up a basic location object for use in tests.
-    // eslint-disable-next-line new-cap
-    location = new Components.interfaces.nsIStandardURL(
-      "https://www.google.com?q=test&ie=utf-8&oe=utf-8&client=firefox-b");
+    sandbox.stub(browser.runtime, "sendMessage");
   });
 
   afterEach(function() {
     sandbox.restore();
   });
 
-  describe("webProgressListener", function() {
-    it("should log an error for unsupported cases", function() {
-      sandbox.stub(console, "error");
+  describe("handleUpdated", function() {
+    describe("Non location changes", function() {
+      it("should ignore non-location changes", function() {
+        sandbox.stub(window, "processURL");
 
-      let progress = {
-        get isTopLevel() {
-          let e = {};
-          throw e;
-        }
-      };
-      webProgressListener.onLocationChange(progress, null, location,
-        Components.interfaces.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT);
+        handleUpdated(TABID, {audible: false}, TABINFO);
 
-      sinon.assert.calledOnce(console.error);
+        sinon.assert.notCalled(window.processURL)
+      });
     });
 
     describe("General Location requests", function() {
       describe("Matches", function() {
         it("should log telemetry for first SAP searches with matching codes", function() {
-          webProgressListener.onLocationChange({isTopLevel: true}, null, location,
-            Components.interfaces.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT);
+          let url = "https://www.google.com/search?q=test&ie=utf-8&oe=utf-8&client=firefox-b";
+          handleUpdated(TABID, {url}, TABINFO);
 
-          sinon.assert.calledOnce(sendAsyncMessage);
-          sinon.assert.calledWithExactly(sendAsyncMessage, kSaveTelemetryMsg, {
-            code: "firefox-b",
-            sap: "google",
-            type: "sap",
+          sinon.assert.calledOnce(browser.runtime.sendMessage);
+          sinon.assert.calledWithExactly(browser.runtime.sendMessage, {
+            name: kSaveTelemetryMsg,
+            data: {
+              code: "firefox-b",
+              extra: null,
+              sap: "google",
+              type: "sap",
+            }
           });
         });
 
         it("should log telemetry for follow-on SAP searches with matching codes", function() {
-          location.ref = "#q=test+yay";
+          let url = "https://www.google.com/search?q=test+yay&client=firefox-b";
+          handleUpdated(TABID, {url}, TABINFO);
 
-          webProgressListener.onLocationChange({isTopLevel: true}, null, location,
-            Components.interfaces.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT);
-
-          sinon.assert.calledOnce(sendAsyncMessage);
-          sinon.assert.calledWithExactly(sendAsyncMessage, kSaveTelemetryMsg, {
-            code: "firefox-b",
-            sap: "google",
-            type: "follow-on",
+          sinon.assert.calledOnce(browser.runtime.sendMessage);
+          sinon.assert.calledWithExactly(browser.runtime.sendMessage, {
+            name: kSaveTelemetryMsg,
+            data: {
+              code: "firefox-b",
+              extra: null,
+              sap: "google",
+              type: "follow-on",
+            }
           });
         });
 
         it("should not send a telemetry for a first search reload", function() {
-          webProgressListener.onLocationChange({isTopLevel: true}, null, location,
-            Components.interfaces.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT);
+          let url = "https://www.google.com/search?q=test123&ie=utf-8&oe=utf-8&client=firefox-b";
+          handleUpdated(TABID, {url}, TABINFO);
 
-          sinon.assert.calledOnce(sendAsyncMessage);
-          sinon.assert.calledWithExactly(sendAsyncMessage, kSaveTelemetryMsg, {
-            code: "firefox-b",
-            sap: "google",
-            type: "sap",
+          sinon.assert.calledOnce(browser.runtime.sendMessage);
+          sinon.assert.calledWithExactly(browser.runtime.sendMessage, {
+            name: kSaveTelemetryMsg,
+            data: {
+              code: "firefox-b",
+              extra: null,
+              sap: "google",
+              type: "sap",
+            }
           });
 
-          webProgressListener.onLocationChange({isTopLevel: true}, null, location,
-            Components.interfaces.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT);
+          handleUpdated(TABID, {url}, TABINFO);
 
           // Check that it has still only been called once.
-          sinon.assert.calledOnce(sendAsyncMessage);
+          sinon.assert.calledOnce(browser.runtime.sendMessage);
+        });
+
+        it("should log telemetry for non-core codes", function() {
+          let url = "https://www.google.com/search?q=test&ie=utf-8&oe=utf-8&client=fake";
+          handleUpdated(TABID, {url}, TABINFO);
+
+          sinon.assert.calledOnce(browser.runtime.sendMessage);
+          sinon.assert.calledWithExactly(browser.runtime.sendMessage, {
+            name: kSaveTelemetryMsg,
+            data: {
+              code: "fake",
+              extra: null,
+              sap: "google",
+              type: "sap",
+            }
+          });
         });
       });
 
       describe("Non-matches", function() {
-        it("should not log telemetry for a non-top-level request", function() {
-          webProgressListener.onLocationChange({isTopLevel: false}, null, location,
-            Components.interfaces.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT);
-
-          sinon.assert.notCalled(sendAsyncMessage);
-        });
-
-        it("should not log telemetry for an error page", function() {
-          webProgressListener.onLocationChange({isTopLevel: true}, null, location,
-            Components.interfaces.nsIWebProgressListener.LOCATION_CHANGE_ERROR_PAGE);
-
-          sinon.assert.notCalled(sendAsyncMessage);
-        });
-
         it("should not log telemetry for non-google domains", function() {
-          location.host = "www.yahoo.com";
+          let url = "https://www.randomsearch.com/search?q=test123&ie=utf-8&oe=utf-8&client=firefox-b";
+          handleUpdated(TABID, {url}, TABINFO);
 
-          webProgressListener.onLocationChange({isTopLevel: true}, null, location,
-            Components.interfaces.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT);
-
-          sinon.assert.notCalled(sendAsyncMessage);
+          sinon.assert.notCalled(browser.runtime.sendMessage);
         });
 
         it("should not log telemetry for non-queries", function() {
-          location.query = "";
+          let url = "https://www.google.com/search";
+          handleUpdated(TABID, {url}, TABINFO);
 
-          webProgressListener.onLocationChange({isTopLevel: true}, null, location,
-            Components.interfaces.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT);
-
-          sinon.assert.notCalled(sendAsyncMessage);
-        });
-
-        it("should not log telemetry for non-search queries", function() {
-          location.query = "?fake=test&ie=utf-8&oe=utf-8";
-
-          webProgressListener.onLocationChange({isTopLevel: true}, null, location,
-            Components.interfaces.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT);
-
-          sinon.assert.notCalled(sendAsyncMessage);
-        });
-
-        it("should not log telemetry for non-matching codes", function() {
-          location.query = "?q=test&ie=utf-8&oe=utf-8&client=fake";
-
-          webProgressListener.onLocationChange({isTopLevel: true}, null, location,
-            Components.interfaces.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT);
-
-          sinon.assert.notCalled(sendAsyncMessage);
+          sinon.assert.notCalled(browser.runtime.sendMessage);
         });
       });
     });

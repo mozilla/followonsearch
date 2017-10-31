@@ -184,7 +184,7 @@ function processURL(location) {
       gLastSearchQueue.push(location.href);
       // Our engine currently sends oe and ie - no one else does
       if (queries.get("oe") && queries.get("ie")) {
-        sendSaveTelemetryMsg(code ? code : "none", code ? domainInfo.sap : "google-nocodes", "sap");
+        sendSaveTelemetryMsg(code ? code : "none", code ? domainInfo.sap : "google-nocodes", "sap", null);
         gSearchingGoogle = true;
       } else {
         // The tbm value is the specific type of search (Books, Images, News, etc).
