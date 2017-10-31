@@ -1,9 +1,9 @@
 "use strict";
 
 /* import-globals-from head.js */
-/* import-globals-from ../../add-on/content/followonsearch-fs.js */
+/* import-globals-from ../../add-on/webextension/background.js */
 
-describe("followonsearch-fs.js", function() {
+describe("background.js", function() {
   let sandbox;
   let location;
 

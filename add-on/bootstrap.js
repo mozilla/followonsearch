@@ -103,6 +103,9 @@ function startup(data, reason) {
   webExtension.startup(reason).then(api => {
     const {browser} = api;
     browser.runtime.onMessage.addListener(handleSaveTelemetryMsg);
+    return Promise.resolve();
+  }).catch(err => {
+    console.error(`WE Follow-On Search startup failed: ${err}`);
   });
 }
 

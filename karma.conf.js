@@ -7,7 +7,7 @@ function isDebug(argument) {
   return argument === "--debug";
 }
 
-let sourcePreprocessors = {"add-on/content/*.js": ["coverage"]};
+let sourcePreprocessors = {"add-on/webextension/*.js": ["coverage"]};
 
 if (process.argv.some(isDebug)) {
   sourcePreprocessors = {};

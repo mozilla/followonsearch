@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* global browser */
+
 "use strict";
 
 const kExtensionID = "followonsearch@mozilla.com";
@@ -217,15 +219,17 @@ function processURL(location) {
       if (queries.get("form").toLowerCase() != "qbre") {
         return;
       }
-      browser.cookies.get({
-        url: location.href,
-        name: "SRCHS"
-      }).then(function(cookie) {
+      (async () => {
+        let cookie = await browser.cookies.get({
+          url: location.href,
+          name: "SRCHS"
+        });
+
         let code = cookie.value.split("=")[1];
         if (domainInfo.codes.includes(code)) {
           sendSaveTelemetryMsg(code, "bing", "follow-on");
         }
-      });
+      })();
     }
   }
   gSearchingGoogle = false;
