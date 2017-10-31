@@ -51,7 +51,7 @@
     "virtualenv-postinstall": "virtualenv-postinstall",
     "test": "npm-run-all lint test:*",
     "test:karma": "NODE_ENV=test karma start",
-    "test:func": "export FIREFOX_BINARY=${FIREFOX_BINARY:-nightly} && npm run bundle && XPI_NAME=dist/followonsearch.xpi mocha test/functional/",
+    "testDisabled:func": "export FIREFOX_BINARY=${FIREFOX_BINARY:-nightly} && npm run bundle && XPI_NAME=dist/followonsearch.xpi mocha test/functional/",
     "uninstall": "node scripts/uninstall_ff.js",
     "funcnonbash": "npm run bundle && mocha test/functional/"
   },
