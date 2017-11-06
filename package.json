@@ -40,7 +40,7 @@
     "multiprocess": true
   },
   "scripts": {
-    "bundle": "mkdir -p dist && cd add-on && zip -r -x .eslintrc -D -q ../dist/followonsearch.xpi . && cd ..",
+    "bundle": "mkdir -p dist && cd add-on && zip -r -x .eslintrc* -D -q ../dist/followonsearch.xpi . && cd ..",
     "download": "node scripts/get_ff.js",
     "firefox": "scripts/runfx.js --binary ${FIREFOX_BINARY:-nightly} --profile dev",
     "lint": "npm-run-all lint:*",
