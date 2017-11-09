@@ -53,7 +53,9 @@
     "test:karma": "NODE_ENV=test karma start",
     "testDisabled:func": "export FIREFOX_BINARY=${FIREFOX_BINARY:-nightly} && npm run bundle && XPI_NAME=dist/followonsearch.xpi mocha test/functional/",
     "uninstall": "node scripts/uninstall_ff.js",
-    "funcnonbash": "npm run bundle && mocha test/functional/"
+    "funcnonbash": "npm run bundle && mocha test/functional/",
+    "preversion": "npm test",
+    "version": "scripts/update-version.sh"
   },
   "license": "MPL-2.0",
   "keywords": [
