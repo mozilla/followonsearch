@@ -23,3 +23,9 @@ Once that has completed, you need to push the results:
 $ git push origin master
 $ git push origin v1.0.0
 ```
+
+Lastly document the release:
+
+* Visit https://github.com/mozilla/followonsearch/releases
+* Select the newly created tag
+* Select Edit, and add some release notes for the changes in the release.
