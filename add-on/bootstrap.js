@@ -4,10 +4,13 @@
 
 "use strict";
 
+/* global APP_STARTUP, APP_SHUTDOWN */
+
 const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
-Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "Services",
+                                  "resource://gre/modules/Services.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "LegacyExtensionsUtils",
                                   "resource://gre/modules/LegacyExtensionsUtils.jsm");
 
@@ -26,6 +29,27 @@ const validSearchTypes = [
 ];
 
 var gLoggingEnabled = false;
+var addonResourceURI;
+var appStartupDone;
+var appStartupPromise = new Promise((resolve, reject) => {
+  appStartupDone = resolve;
+});
+var startupReason;
+
+const appStartupObserver = {
+  register() {
+    Services.obs.addObserver(this, "sessionstore-windows-restored");
+  },
+
+  unregister() {
+    Services.obs.removeObserver(this, "sessionstore-windows-restored");
+  },
+
+  observe() {
+    appStartupDone();
+    this.unregister();
+  }
+};
 
 /**
  * Logs a message to the console if logging is enabled.
@@ -91,18 +115,27 @@ function uninstall(data, reason) {
  * @param {Number} reason Indicates why the extension is being started.
  */
 function startup(data, reason) {
-  try {
-    gLoggingEnabled = Services.prefs.getBoolPref(PREF_LOGGING, false);
-  } catch (e) {
-    // Needed until Firefox 54
+  startupReason = reason;
+  if (reason === APP_STARTUP) {
+    appStartupObserver.register();
+  } else {
+    appStartupDone();
   }
 
+  addonResourceURI = data.resourceURI;
+  appStartupPromise = appStartupPromise.then(handleStartup);
+}
+
+function handleStartup() {
+  gLoggingEnabled = Services.prefs.getBoolPref(PREF_LOGGING, false);
   const webExtension = LegacyExtensionsUtils.getEmbeddedExtensionFor({
-    id: kExtensionID
+    id: kExtensionID,
+    resourceURI: addonResourceURI,
   });
-  webExtension.startup(reason).then(api => {
+  webExtension.startup(startupReason).then(api => {
     const {browser} = api;
     browser.runtime.onMessage.addListener(handleSaveTelemetryMsg);
+    log("extension started");
     return Promise.resolve();
   }).catch(err => {
     console.error(`WE Follow-On Search startup failed: ${err}`);
@@ -117,7 +150,15 @@ function startup(data, reason) {
  */
 function shutdown(data, reason) {
   const webExtension = LegacyExtensionsUtils.getEmbeddedExtensionFor({
-    id: kExtensionID
+    id: kExtensionID,
+    resourceURI: addonResourceURI,
   });
-  webExtension.shutdown(reason);
+  // Immediately exit if Firefox is exiting
+  if (reason === APP_SHUTDOWN) {
+    webExtension.shutdown(reason)
+    return;
+  }
+  appStartupPromise = appStartupPromise.then(() => {
+    return webExtension.shutdown(reason)
+  });
 }
