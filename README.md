@@ -9,4 +9,5 @@ Firefox Follow-on Search Telemetry.
 * Testing
   * [Linting](docs/Linting.md)
   * [Unit Tests](docs/UnitTests.md)
+  * [Mochitests](docs/Mochitests.md)
   * [Functional Tests](docs/Functional.md)
