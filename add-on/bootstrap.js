@@ -6,13 +6,12 @@
 
 /* global APP_STARTUP, APP_SHUTDOWN */
 
-const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Timer.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "Services",
-                                  "resource://gre/modules/Services.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "LegacyExtensionsUtils",
-                                  "resource://gre/modules/LegacyExtensionsUtils.jsm");
+ChromeUtils.defineModuleGetter(this, "LegacyExtensionsUtils",
+                               "resource://gre/modules/LegacyExtensionsUtils.jsm");
 
 // Preferences this add-on uses.
 const kPrefPrefix = "extensions.followonsearch.";

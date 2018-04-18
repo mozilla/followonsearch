@@ -87,7 +87,7 @@ def exportFilesToMC(repoDir, mcRepoLoc):
                 os.remove(os.path.join(root, file))
 
     addonDir = os.path.join(repoDir, "add-on")
-    # testDir = os.path.join(repoDir, "test", "addon")
+    testDir = os.path.join(repoDir, "test", "mochitest")
     # enUSFile = os.path.join(addonDir, "webextension", "_locales", "en_US",
     #                        "messages.json")
 
@@ -112,15 +112,15 @@ def exportFilesToMC(repoDir, mcRepoLoc):
                 os.mkdir(dirPath, 0755)
 
     # Copy the test files.
-    # mc_test_loc = os.path.join(mcRepoLoc, "test", "browser")
-    # if not os.path.exists(mc_test_loc):
-    #    os.makedirs(mc_test_loc, 0755)
+    mc_test_loc = os.path.join(mcRepoLoc, "test", "browser")
+    if not os.path.exists(mc_test_loc):
+        os.makedirs(mc_test_loc, 0755)
 
-    # for root, dirs, files in os.walk(testDir):
-        # for file in files:
-        #     copyfile(os.path.join(root, file),
-        #              os.path.join(mc_test_loc, os.path.relpath(root, testDir),
-        #              file))
+    for root, dirs, files in os.walk(testDir):
+        for file in files:
+            copyfile(os.path.join(root, file),
+                     os.path.join(mc_test_loc, os.path.relpath(root, testDir),
+                     file))
 
     # Finally, update the moz.build file.
     # runProcess([".venv/bin/python", "bin/update_mozbuild.py"], repoDir,
